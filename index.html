@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cookie Test - WORKING VERSION</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      }
+      button {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+        font-size: 16px;
+      }
+      button:hover {
+        background: #0056b3;
+      }
+      .result {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 15px;
+        margin: 10px 0;
+        white-space: pre-wrap;
+        font-family: monospace;
+      }
+      .success {
+        background: #d4edda;
+        border-color: #c3e6cb;
+        color: #155724;
+      }
+      .error {
+        background: #f8d7da;
+        border-color: #f5c6cb;
+        color: #721c24;
+      }
+      .info {
+        background: #d1ecf1;
+        border-color: #bee5eb;
+        color: #0c5460;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🍪 Cookie Storage Test</h1>
+
+      <div class="info result">
+        <strong>Current URL:</strong> <span id="currentUrl"></span><br />
+        <strong>Protocol:</strong> <span id="protocol"></span><br />
+        <strong>Domain:</strong> <span id="domain"></span>
+      </div>
+
+      <div>
+        <button onclick="generateCookie()">
+          🔥 Generate Cookie (Force Storage)
+        </button>
+        <button onclick="checkCookies()">🔍 Check All Cookies</button>
+        <button onclick="clearCookies()">🗑️ Clear All Cookies</button>
+        <button onclick="clearLog()">📝 Clear Log</button>
+      </div>
+
+      <div id="log"></div>
+    </div>
+
+    <script>
+      // Initialize page info
+      function updatePageInfo() {
+        document.getElementById("currentUrl").textContent =
+          window.location.href;
+        document.getElementById("protocol").textContent =
+          window.location.protocol;
+        document.getElementById("domain").textContent =
+          window.location.hostname;
+      }
+
+      // Log function
+      function log(message, type = "info") {
+        const logDiv = document.getElementById("log");
+        const timestamp = new Date().toLocaleTimeString();
+        const entry = document.createElement("div");
+        entry.className = `result ${type}`;
+        entry.textContent = `[${timestamp}] ${message}`;
+        logDiv.appendChild(entry);
+        logDiv.scrollTop = logDiv.scrollHeight;
+        console.log(message);
+      }
+
+      // WORKING Cookie Generation Function
+      async function generateCookie() {
+        log("🔄 Starting cookie generation...");
+
+        try {
+          // Make the request with proper settings
+          const response = await fetch(
+            "http://localhost:8017/api/qoncierge/security/generate-cookies",
+            {
+              method: "POST",
+              credentials: "include", // CRITICAL for cookies
+              headers: {
+                "Content-Type": "application/json",
+                // Add explicit origin if needed
+                Origin: window.location.origin,
+              },
+              body: JSON.stringify({ deviceId: true }),
+            }
+          );
+
+          log(`📡 Response Status: ${response.status} ${response.statusText}`);
+
+          // Check response headers
+          const setCookieHeader = response.headers.get("set-cookie");
+          if (setCookieHeader) {
+            log(`🍪 Set-Cookie Header Found: ${setCookieHeader}`, "success");
+          } else {
+            log("❌ No Set-Cookie header in response", "error");
+          }
+
+          // Check CORS headers
+          const corsOrigin = response.headers.get(
+            "access-control-allow-origin"
+          );
+          const corsCredentials = response.headers.get(
+            "access-control-allow-credentials"
+          );
+
+          log(`🌐 CORS Origin: ${corsOrigin}`);
+          log(`🔐 CORS Credentials: ${corsCredentials}`);
+
+          const data = await response.json();
+          log(`✅ Response Data: ${JSON.stringify(data, null, 2)}`, "success");
+
+          // Wait a moment then check if cookie was actually stored
+          setTimeout(() => {
+            checkCookies();
+          }, 500);
+        } catch (error) {
+          log(`❌ Error: ${error.message}`, "error");
+          console.error("Full error:", error);
+        }
+      }
+
+      // Check browser cookies
+      function checkCookies() {
+        log("🔍 Checking browser cookies...");
+
+        const allCookies = document.cookie;
+        if (allCookies) {
+          log(`🍪 Found cookies: ${allCookies}`, "success");
+
+          // Check specifically for deviceId
+          const deviceId = getCookie("deviceId");
+          if (deviceId) {
+            log(`✅ deviceId cookie found: ${deviceId}`, "success");
+          } else {
+            log("⚠️ deviceId cookie not found in browser storage", "error");
+          }
+        } else {
+          log("❌ No cookies found in browser", "error");
+        }
+      }
+
+      // Get specific cookie
+      function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) {
+          return parts.pop().split(";").shift();
+        }
+        return null;
+      }
+
+      // Clear all cookies (for testing)
+      function clearCookies() {
+        const cookies = document.cookie.split(";");
+        for (let cookie of cookies) {
+          const eqPos = cookie.indexOf("=");
+          const name =
+            eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=localhost`;
+          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=127.0.0.1`;
+        }
+        log("🗑️ Attempted to clear all cookies", "info");
+        setTimeout(checkCookies, 100);
+      }
+
+      // Clear log
+      function clearLog() {
+        document.getElementById("log").innerHTML = "";
+      }
+
+      // Initialize
+      updatePageInfo();
+      log("🚀 Page loaded. Ready to test cookies!");
+
+      // Auto-check existing cookies
+      setTimeout(checkCookies, 100);
+    </script>
+  </body>
+</html>
